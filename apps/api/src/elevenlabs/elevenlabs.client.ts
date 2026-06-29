@@ -57,7 +57,7 @@ export async function provisionAgent(config: InstrumentConfig): Promise<string> 
 
 export async function getSignedUrl(agentId: string): Promise<string> {
   const res = await fetch(
-    `${BASE_URL}/convai/agents/${agentId}/link`,
+    `${BASE_URL}/convai/conversation/get_signed_url?agent_id=${agentId}`,
     { headers: headers() },
   );
   if (!res.ok) {
