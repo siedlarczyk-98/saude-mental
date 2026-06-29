@@ -42,7 +42,7 @@ export class ExtractionService {
     config: InstrumentConfig,
   ): Promise<ExtractionResult> {
     const itemDescriptions = config.extractionSpec
-      .map((s) => `Item ${s.itemNumber}: ${s.extractionPrompt}`)
+      .map((s: { itemNumber: number; extractionPrompt: string }) => `Item ${s.itemNumber}: ${s.extractionPrompt}`)
       .join('\n');
 
     const systemPrompt =
