@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import type { Kysely } from 'kysely';
-import type { InstrumentConfig } from '@saude-mental/shared';
+import type { InstrumentConfig } from '../shared.js';
 import type { Database } from '../db/types.js';
 
 const client = new Anthropic();

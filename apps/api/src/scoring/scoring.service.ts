@@ -1,5 +1,5 @@
 import type { Kysely } from 'kysely';
-import type { InstrumentConfig } from '@saude-mental/shared';
+import type { InstrumentConfig } from '../shared.js';
 import type { Database, Norm } from '../db/types.js';
 
 // ---------------------------------------------------------------------------

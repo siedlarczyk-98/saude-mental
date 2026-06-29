@@ -1,4 +1,4 @@
-import type { InstrumentConfig } from '@saude-mental/shared';
+import type { InstrumentConfig } from '../shared.js';
 import { batConfig } from './configs/bat.js';
 
 const registry = new Map<string, InstrumentConfig>([['BAT', batConfig]]);

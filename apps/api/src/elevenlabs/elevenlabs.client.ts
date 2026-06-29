@@ -1,4 +1,4 @@
-import type { InstrumentConfig } from '@saude-mental/shared';
+import type { InstrumentConfig } from '../shared.js';
 
 const BASE_URL = 'https://api.elevenlabs.io/v1';
 

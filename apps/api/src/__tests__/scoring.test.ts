@@ -1,6 +1,6 @@
 import { computeScore } from '../scoring/scoring.service.js';
 import type { ItemScoreInput } from '../scoring/scoring.service.js';
-import type { InstrumentConfig } from '@saude-mental/shared';
+import type { InstrumentConfig } from '../../shared.js';
 import type { Norm } from '../db/types.js';
 
 const INSTRUMENT_ID = 'test-instrument-id';

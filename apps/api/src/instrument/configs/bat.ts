@@ -1,4 +1,4 @@
-import type { InstrumentConfig } from '@saude-mental/shared';
+import type { InstrumentConfig } from '../../shared.js';
 
 // UUID deve bater com o registro semeado em instrument.instruments para o BAT.
 // Substituir pelo valor real após confirmar no banco.

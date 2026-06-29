@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Kysely } from 'kysely';
-import type { InstrumentConfig } from '@saude-mental/shared';
+import type { InstrumentConfig } from '../shared.js';
 import type { Database } from '../db/types.js';
 import { ScoringService } from '../scoring/scoring.service.js';
 import { SafetyService } from '../safety/safety.service.js';
