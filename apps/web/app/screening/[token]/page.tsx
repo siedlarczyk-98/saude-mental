@@ -193,9 +193,14 @@ function VoiceScreen({ signedUrl, assessmentId, currentQuestion, totalQuestions,
 
   const now = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
+  const endingRef = useRef(false);
+
   const conversation = useConversation({
     onConnect: () => setVoiceStatus('connected'),
-    onDisconnect: () => { setVoiceStatus('disconnected'); onEnd(); },
+    onDisconnect: () => {
+      setVoiceStatus('disconnected');
+      onEnd();
+    },
     onMessage: (msg: { message: string; source: 'ai' | 'user' }) => {
       setTranscript(prev => [...prev, { isAgent: msg.source === 'ai', text: msg.message, time: now() }]);
     },
@@ -212,7 +217,7 @@ function VoiceScreen({ signedUrl, assessmentId, currentQuestion, totalQuestions,
         }).catch(() => {});
       }
     }).catch(() => {});
-    return () => { conversation.endSession(); };
+    // não chamar endSession no cleanup — deixar o botão encerrar limpo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedUrl]);
 
@@ -301,7 +306,11 @@ function VoiceScreen({ signedUrl, assessmentId, currentQuestion, totalQuestions,
       {/* Controls */}
       <div style={{ display: 'flex', gap: 16, alignItems: 'center', animation: 'fade-in-up 0.5s 0.5s ease both', opacity: 0 }}>
         <button
-          onClick={() => { conversation.endSession(); onEnd(); }}
+          onClick={() => {
+            if (endingRef.current) return;
+            endingRef.current = true;
+            conversation.endSession();
+          }}
           style={{ padding: '0 32px', height: 52, borderRadius: 26, background: 'rgba(45,74,62,0.08)', border: '1.5px solid rgba(45,74,62,0.15)', cursor: 'pointer', fontFamily: 'var(--font-dm-sans)', fontSize: 14, fontWeight: 500, color: '#2D4A3E', transition: 'all 0.2s', letterSpacing: '0.01em' }}
         >
           Encerrar conversa
@@ -403,8 +412,8 @@ export default function ScreeningPage({ params }: { params: { token: string } })
   const handleEnd = useCallback(async () => {
     setScreen('end');
     // Poll for result (ElevenLabs webhook may take a moment)
-    for (let i = 0; i < 10; i++) {
-      await new Promise(r => setTimeout(r, 3000));
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 5000));
       try {
         const res = await fetch(`${API}/assessments/${token}/result`);
         if (res.ok) {
