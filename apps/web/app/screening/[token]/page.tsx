@@ -203,7 +203,15 @@ function VoiceScreen({ signedUrl, assessmentId, currentQuestion, totalQuestions,
   });
 
   useEffect(() => {
-    conversation.startSession({ signedUrl });
+    conversation.startSession({ signedUrl }).then((conversationId: string) => {
+      if (conversationId) {
+        fetch(`${API}/assessments/${assessmentId}/call/started`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId }),
+        }).catch(() => {});
+      }
+    }).catch(() => {});
     return () => { conversation.endSession(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedUrl]);

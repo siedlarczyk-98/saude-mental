@@ -110,6 +110,22 @@ export async function registerRoutes(app: FastifyInstance) {
   );
 
   // -------------------------------------------------------------------------
+  // POST /assessments/:token/call/started — salva conversationId do ElevenLabs
+  // -------------------------------------------------------------------------
+  app.post(
+    '/assessments/:token/call/started',
+    async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
+      const { token } = request.params;
+      const assessment = await assessmentService.assertValidToken(token);
+      const { conversationId } = request.body as { conversationId: string };
+      if (conversationId) {
+        await assessmentService.startCall(assessment.id, conversationId);
+      }
+      return reply.status(204).send();
+    },
+  );
+
+  // -------------------------------------------------------------------------
   // POST /webhook/elevenlabs — payload pós-call do ElevenLabs
   // -------------------------------------------------------------------------
   app.post(
