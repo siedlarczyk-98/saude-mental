@@ -141,7 +141,7 @@ export async function registerRoutes(app: FastifyInstance) {
         }
       } else {
         // Fallback: validação HMAC via header
-        const sig = request.headers['x-elevenlabs-signature'];
+        const sig = request.headers['elevenlabs-signature'];
         const rawBody = (request as FastifyRequest & { rawBody?: Buffer }).rawBody;
         if (!rawBody || !sig || !verifySignature(rawBody, sig as string, secret)) {
           return reply.status(401).send({ error: 'invalid_signature' });
@@ -160,7 +160,7 @@ export async function registerRoutes(app: FastifyInstance) {
     const row = await db
       .selectFrom('assessment.assessments')
       .select('instrument_id')
-      .where('el_conversation_id', '=', payload.conversation_id)
+      .where('el_conversation_id', '=', payload.data.conversation_id)
       .executeTakeFirst();
 
     if (!row) return reply.status(404).send({ error: 'assessment_not_found' });

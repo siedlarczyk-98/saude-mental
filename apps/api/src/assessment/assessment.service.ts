@@ -83,7 +83,7 @@ export class AssessmentService {
   async startCall(assessmentId: string, conversationId: string): Promise<void> {
     await this.db
       .updateTable('assessment.assessments')
-      .set({ status: 'in_progress', el_conversation_id: conversationId })
+      .set({ status: 'in_progress', el_conversation_id: conversationId, started_at: new Date() })
       .where('id', '=', assessmentId)
       .where('status', 'in', ['consented', 'in_progress'])
       .execute();

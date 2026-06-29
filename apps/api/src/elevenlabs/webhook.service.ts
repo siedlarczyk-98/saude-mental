@@ -12,17 +12,25 @@ import { classifyCrisisSignals } from '../safety/safety.llm.js';
 // Schema do payload pós-call do ElevenLabs
 // ---------------------------------------------------------------------------
 
+const TranscriptTurnSchema = z.object({
+  role: z.enum(['agent', 'user']),
+  message: z.string(),
+  time_in_call_secs: z.number().optional(),
+});
+
 export const ElevenLabsWebhookSchema = z.object({
-  type: z.literal('post_call_transcription'),
-  conversation_id: z.string(),
-  agent_id: z.string(),
-  status: z.string(),
-  transcript: z.string().optional(),
-  metadata: z
-    .object({
-      assessment_id: z.string().optional(),
-    })
-    .optional(),
+  type: z.string(),
+  event_timestamp: z.number().optional(),
+  data: z.object({
+    conversation_id: z.string(),
+    agent_id: z.string(),
+    status: z.string().optional(),
+    transcript: z.array(TranscriptTurnSchema).optional(),
+    analysis: z.object({
+      data_collection_results: z.record(z.unknown()).optional(),
+      transcript_summary: z.string().optional(),
+    }).optional(),
+  }),
 });
 
 export type ElevenLabsWebhookPayload = z.infer<typeof ElevenLabsWebhookSchema>;
@@ -54,11 +62,13 @@ export class WebhookService {
     const assessment = await this.db
       .selectFrom('assessment.assessments')
       .selectAll()
-      .where('el_conversation_id', '=', payload.conversation_id)
+      .where('el_conversation_id', '=', payload.data.conversation_id)
       .executeTakeFirstOrThrow();
 
     const assessmentId = assessment.id;
-    const transcript = payload.transcript ?? '';
+    const transcript = (payload.data.transcript ?? [])
+      .map(t => `${t.role === 'agent' ? 'Agente' : 'Usuário'}: ${t.message}`)
+      .join('\n');
 
     // Remove respostas anteriores (idempotência — webhook pode chegar mais de uma vez)
     await this.db
