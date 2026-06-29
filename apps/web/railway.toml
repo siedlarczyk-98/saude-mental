@@ -1,7 +1,7 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "cd ../.. && npm install && npm run build -w apps/web"
+buildCommand = "npm run build"
 
 [deploy]
-startCommand = "cd ../.. && npm run start -w apps/web"
+startCommand = "npm run start"
 healthcheckPath = "/"
