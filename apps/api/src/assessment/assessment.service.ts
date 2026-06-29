@@ -1,68 +1,36 @@
-import crypto from 'node:crypto';
 import type { Kysely } from 'kysely';
-import type { Database, Assessment, NewAssessment } from '../db/types.js';
-import { ConsentService } from '../consent/consent.service.js';
-
-const TOKEN_TTL_HOURS = 72;
+import type { Database, Assessment } from '../db/types.js';
 
 export class AssessmentService {
-  private consentService: ConsentService;
+  constructor(private db: Kysely<Database>) {}
 
-  constructor(private db: Kysely<Database>) {
-    this.consentService = new ConsentService(db);
-  }
-
-  // Cria participante (se necessário) + consentimento + assessment.
-  // Retorna o token de magic-link para envio ao participante.
   async invite(opts: {
     companyId: string;
     departmentId?: string;
     instrumentId: string;
-    pseudonym: string;
-  }): Promise<{ assessmentId: string; magicLinkToken: string }> {
+  }): Promise<{ assessmentId: string }> {
     return this.db.transaction().execute(async (trx) => {
-      // Participante
       const participant = await trx
         .insertInto('core.participants')
         .values({
           company_id: opts.companyId,
           department_id: opts.departmentId ?? null,
-          pseudonym: opts.pseudonym,
+          status: 'invited',
         })
         .returningAll()
         .executeTakeFirstOrThrow();
-
-      // Consentimento (pré-grant — o participante confirma na UI)
-      // O assessment só muda para 'consented' após o participante aceitar na web.
-      const consent = await trx
-        .insertInto('assessment.consents')
-        .values({
-          participant_id: participant.id,
-          instrument_id: opts.instrumentId,
-          scopes: JSON.stringify({ screening: true, share_aggregate: false }),
-          granted_at: new Date().toISOString(),
-        })
-        .returningAll()
-        .executeTakeFirstOrThrow();
-
-      const token = crypto.randomBytes(32).toString('hex');
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + TOKEN_TTL_HOURS);
 
       const assessment = await trx
         .insertInto('assessment.assessments')
         .values({
           participant_id: participant.id,
           instrument_id: opts.instrumentId,
-          consent_id: consent.id,
           status: 'invited',
-          magic_link_token: token,
-          magic_link_expires_at: expiresAt,
-        } satisfies NewAssessment)
+        })
         .returningAll()
         .executeTakeFirstOrThrow();
 
-      return { assessmentId: assessment.id, magicLinkToken: token };
+      return { assessmentId: assessment.id };
     });
   }
 
@@ -70,7 +38,7 @@ export class AssessmentService {
     const row = await this.db
       .selectFrom('assessment.assessments')
       .selectAll()
-      .where('magic_link_token', '=', token)
+      .where('id', '=', token)
       .executeTakeFirst();
 
     return row ?? null;
@@ -79,13 +47,9 @@ export class AssessmentService {
   async assertValidToken(token: string): Promise<Assessment> {
     const assessment = await this.findByToken(token);
     if (!assessment) throw new AssessmentNotFoundError(token);
-    if (new Date() > assessment.magic_link_expires_at) {
-      throw new AssessmentExpiredError(token);
-    }
     return assessment;
   }
 
-  // Participante confirmou consentimento na UI — avança o status.
   async recordConsent(
     assessmentId: string,
     shareAggregate: boolean,
@@ -97,14 +61,15 @@ export class AssessmentService {
         .where('id', '=', assessmentId)
         .executeTakeFirstOrThrow();
 
-      // Atualiza scopes do consentimento conforme escolha do participante
-      await trx
-        .updateTable('assessment.consents')
-        .set({
-          scopes: JSON.stringify({ screening: true, share_aggregate: shareAggregate }),
-        })
-        .where('id', '=', assessment.consent_id)
-        .execute();
+      if (assessment.consent_id) {
+        await trx
+          .updateTable('assessment.consents')
+          .set({
+            scopes: JSON.stringify({ screening: true, share_aggregate: shareAggregate }),
+          })
+          .where('id', '=', assessment.consent_id)
+          .execute();
+      }
 
       await trx
         .updateTable('assessment.assessments')
@@ -118,7 +83,7 @@ export class AssessmentService {
   async startCall(assessmentId: string, conversationId: string): Promise<void> {
     await this.db
       .updateTable('assessment.assessments')
-      .set({ status: 'in_progress', elevenlabs_conversation_id: conversationId })
+      .set({ status: 'in_progress', el_conversation_id: conversationId })
       .where('id', '=', assessmentId)
       .where('status', 'in', ['consented', 'in_progress'])
       .execute();
@@ -143,14 +108,14 @@ export class AssessmentService {
 
 export class AssessmentNotFoundError extends Error {
   constructor(token: string) {
-    super(`Assessment not found for token: ${token}`);
+    super(`Assessment not found: ${token}`);
     this.name = 'AssessmentNotFoundError';
   }
 }
 
 export class AssessmentExpiredError extends Error {
   constructor(token: string) {
-    super(`Magic link expired for token: ${token}`);
+    super(`Assessment expired: ${token}`);
     this.name = 'AssessmentExpiredError';
   }
 }

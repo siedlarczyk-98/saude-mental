@@ -99,11 +99,12 @@ export class ExtractionService {
 
     const parsed = ExtractionResultSchema.parse(toolUseBlock.input);
 
-    // Busca itens do instrumento para mapear itemNumber -> itemId
+    // Busca itens do instrumento via subscales (items não tem instrument_id diretamente)
     const items = await this.db
-      .selectFrom('instrument.items')
-      .select(['id', 'item_number'])
-      .where('instrument_id', '=', config.instrumentId)
+      .selectFrom('instrument.items as i')
+      .innerJoin('instrument.subscales as s', 's.id', 'i.subscale_id')
+      .select(['i.id', 'i.item_number'])
+      .where('s.instrument_id', '=', config.instrumentId)
       .execute();
 
     const itemByNumber = new Map(items.map((i) => [i.item_number, i.id]));
@@ -124,7 +125,8 @@ export class ExtractionService {
           item_id: itemId,
           score,
           frequency_set: extraction.frequency_set,
-          raw_response: extraction.evidence,
+          extractor_model: 'claude-sonnet-4-6',
+          extracted_at: new Date(),
         })
         .returning(['id'])
         .execute();

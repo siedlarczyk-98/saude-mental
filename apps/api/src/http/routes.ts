@@ -12,7 +12,6 @@ const InviteBodySchema = z.object({
   companyId: z.string().uuid(),
   departmentId: z.string().uuid().optional(),
   instrumentCode: z.string(),
-  pseudonym: z.string().min(1).max(64),
 });
 
 const ConsentBodySchema = z.object({
@@ -36,19 +35,17 @@ export async function registerRoutes(app: FastifyInstance) {
     const parsed = InviteBodySchema.safeParse(request.body);
     if (!parsed.success) return badRequest(reply, parsed.error);
 
-    const { companyId, departmentId, instrumentCode, pseudonym } = parsed.data;
+    const { companyId, departmentId, instrumentCode } = parsed.data;
     const config = getInstrumentConfig(instrumentCode);
 
     const result = await assessmentService.invite({
       companyId,
       departmentId,
       instrumentId: config.instrumentId,
-      pseudonym,
     });
 
     return reply.status(201).send({
       assessmentId: result.assessmentId,
-      magicLinkToken: result.magicLinkToken,
     });
   });
 
@@ -67,7 +64,6 @@ export async function registerRoutes(app: FastifyInstance) {
         assessmentId: assessment.id,
         status: assessment.status,
         instrumentId: assessment.instrument_id,
-        expiresAt: assessment.magic_link_expires_at,
       });
     },
   );
@@ -148,7 +144,7 @@ export async function registerRoutes(app: FastifyInstance) {
     const row = await db
       .selectFrom('assessment.assessments')
       .select('instrument_id')
-      .where('elevenlabs_conversation_id', '=', payload.conversation_id)
+      .where('el_conversation_id', '=', payload.conversation_id)
       .executeTakeFirst();
 
     if (!row) return reply.status(404).send({ error: 'assessment_not_found' });
@@ -187,7 +183,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
       const safetyEvents = await db
         .selectFrom('assessment.safety_events')
-        .select(['severity', 'flagged_assessment'])
+        .select(['severity', 'resolved'])
         .where('assessment_id', '=', assessment.id)
         .execute();
 
@@ -212,11 +208,9 @@ export async function registerRoutes(app: FastifyInstance) {
 
 type ScoreRow = {
   subscale_id: string | null;
-  score: number;
-  completeness_pct: number;
+  mean_score: number | null;
+  completeness: number;
   band: 'green' | 'orange' | 'red' | null;
-  norm_is_placeholder: boolean;
-  is_inconclusive: boolean;
 };
 
 function buildResultResponse(opts: {
@@ -227,8 +221,8 @@ function buildResultResponse(opts: {
   assessmentStatus: string;
 }) {
   const { totalScore, hasCrisis } = opts;
-  const isInconclusive = totalScore?.is_inconclusive ?? true;
-  const normIsPlaceholder = totalScore?.norm_is_placeholder ?? true;
+  const isInconclusive = totalScore?.mean_score === null || totalScore === undefined;
+  const normIsPlaceholder = totalScore?.band === null && !isInconclusive;
 
   let summaryText: string;
   if (isInconclusive) {
@@ -237,7 +231,7 @@ function buildResultResponse(opts: {
       'Isso pode acontecer se a chamada foi interrompida ou muito breve.';
   } else if (normIsPlaceholder) {
     summaryText =
-      `Sua pontuação geral foi de ${totalScore?.score?.toFixed(2) ?? 'N/A'} (escala 1–5). ` +
+      `Sua pontuação geral foi de ${totalScore?.mean_score?.toFixed(2) ?? 'N/A'} (escala 1–5). ` +
       'Os parâmetros de referência ainda estão em calibração para a população brasileira, ' +
       'por isso não é possível apresentar uma classificação de risco neste momento.';
   } else {
@@ -248,7 +242,7 @@ function buildResultResponse(opts: {
     };
     const bandLabel = totalScore?.band ? (bandLabels[totalScore.band] ?? 'indeterminado') : 'indeterminado';
     summaryText =
-      `Sua pontuação geral foi de ${totalScore?.score?.toFixed(2) ?? 'N/A'} (escala 1–5), ` +
+      `Sua pontuação geral foi de ${totalScore?.mean_score?.toFixed(2) ?? 'N/A'} (escala 1–5), ` +
       `indicando ${bandLabel}.`;
   }
 
@@ -277,15 +271,15 @@ function buildResultResponse(opts: {
     calibrationPending: normIsPlaceholder,
     total: totalScore
       ? {
-          score: totalScore.score,
-          completeness: totalScore.completeness_pct,
-          band: normIsPlaceholder ? null : totalScore.band,
+          score: totalScore.mean_score,
+          completeness: totalScore.completeness,
+          band: totalScore.band,
         }
       : null,
     subscales: opts.subscaleScores.map((s) => ({
       subscaleId: s.subscale_id,
-      score: s.score,
-      band: s.norm_is_placeholder ? null : s.band,
+      score: s.mean_score,
+      band: s.band,
     })),
   };
 }

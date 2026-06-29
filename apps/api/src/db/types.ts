@@ -7,13 +7,9 @@ import type { ColumnType, Generated, Insertable, Selectable, Updateable } from '
 export interface InstrumentTable {
   id: Generated<string>;
   code: string;
-  name: string;
-  version: string | null;
-  scoring_method: 'mean' | 'sum';
-  response_scale_min: number;
-  response_scale_max: number;
-  completeness_floor: number;
-  total_includes: 'primary' | 'all';
+  variant: string;
+  version: string;
+  language: string;
   created_at: ColumnType<Date, never, never>;
 }
 
@@ -22,13 +18,12 @@ export interface SubscaleTable {
   instrument_id: string;
   code: string;
   name: string;
-  is_primary: boolean;
-  item_count: number | null;
+  type: string;
+  display_order: number;
 }
 
 export interface ItemTable {
   id: Generated<string>;
-  instrument_id: string;
   subscale_id: string;
   item_number: number;
   text: string;
@@ -46,12 +41,11 @@ export interface ResponseOptionTable {
 export interface NormTable {
   id: Generated<string>;
   instrument_id: string;
-  subscale_id: string | null;
+  scope: string;
   band: 'green' | 'orange' | 'red';
-  score_min: number;
-  score_max: number;
-  is_placeholder: boolean;
-  created_at: ColumnType<Date, never, never>;
+  min_score: number;
+  max_score: number;
+  source_note: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +54,7 @@ export interface NormTable {
 
 export interface CompanyTable {
   id: Generated<string>;
+  tenant_id: string;
   name: string;
   created_at: ColumnType<Date, never, never>;
 }
@@ -68,13 +63,14 @@ export interface DepartmentTable {
   id: Generated<string>;
   company_id: string;
   name: string;
+  created_at: ColumnType<Date, never, never>;
 }
 
 export interface ParticipantTable {
   id: Generated<string>;
   company_id: string;
   department_id: string | null;
-  pseudonym: string;
+  status: string;
   created_at: ColumnType<Date, never, never>;
 }
 
@@ -83,11 +79,10 @@ export interface ParticipantTable {
 // ---------------------------------------------------------------------------
 
 export interface ParticipantIdentityTable {
-  id: Generated<string>;
   participant_id: string;
-  encrypted_name: Buffer | null;
-  encrypted_email: Buffer | null;
-  encryption_key_id: string | null;
+  enc_name: Buffer | null;
+  enc_email: Buffer | null;
+  enc_cpf: Buffer | null;
   created_at: ColumnType<Date, never, never>;
 }
 
@@ -98,23 +93,24 @@ export interface ParticipantIdentityTable {
 export interface ConsentTable {
   id: Generated<string>;
   participant_id: string;
-  instrument_id: string;
-  scopes: unknown; // jsonb: { share_aggregate: boolean, ... }
-  granted_at: ColumnType<Date, string, never>;
+  text_version: string;
+  scopes: unknown;
+  granted_at: ColumnType<Date, never, never>;
   revoked_at: Date | null;
+  ip_address: string | null;
 }
 
 export interface AssessmentTable {
   id: Generated<string>;
   participant_id: string;
   instrument_id: string;
-  consent_id: string;
+  consent_id: string | null;
   status: 'invited' | 'consented' | 'in_progress' | 'completed' | 'flagged';
-  magic_link_token: string;
-  magic_link_expires_at: Date;
-  elevenlabs_conversation_id: string | null;
-  created_at: ColumnType<Date, never, never>;
+  channel: ColumnType<string, string | undefined, string>;
+  el_conversation_id: string | null;
+  started_at: Date | null;
   completed_at: Date | null;
+  created_at: ColumnType<Date, never, never>;
 }
 
 export interface ItemResponseTable {
@@ -122,14 +118,16 @@ export interface ItemResponseTable {
   assessment_id: string;
   item_id: string;
   score: number | null;
+  confidence: string | null;
   frequency_set: boolean;
-  raw_response: string | null;
-  created_at: ColumnType<Date, never, never>;
+  source: string | null;
+  extractor_model: string | null;
+  extracted_at: Date | null;
 }
 
 export interface ResponseEvidenceTable {
-  id: Generated<string>;
   item_response_id: string;
+  enc_quote: Buffer | null;
   verbatim: string;
   created_at: ColumnType<Date, never, never>;
 }
@@ -137,30 +135,29 @@ export interface ResponseEvidenceTable {
 export interface CoverageSnapshotTable {
   id: Generated<string>;
   assessment_id: string;
-  covered_item_ids: string[];
-  completeness_pct: number;
-  snapshot_at: ColumnType<Date, never, never>;
+  state: unknown;
+  captured_at: ColumnType<Date, never, never>;
 }
 
 export interface AssessmentScoreTable {
   id: Generated<string>;
   assessment_id: string;
   subscale_id: string | null;
-  score: number;
-  completeness_pct: number;
+  mean_score: number | null;
+  completeness: number;
   band: 'green' | 'orange' | 'red' | null;
-  norm_is_placeholder: boolean;
-  is_inconclusive: boolean;
   computed_at: ColumnType<Date, never, never>;
 }
 
 export interface SafetyEventTable {
   id: Generated<string>;
   assessment_id: string;
+  type: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
-  signal: string;
-  flagged_assessment: boolean;
-  created_at: ColumnType<Date, never, never>;
+  action_taken: ColumnType<string, string | undefined, string>;
+  detected_at: ColumnType<Date, never, never>;
+  resolved: ColumnType<boolean, boolean | undefined, boolean>;
+  notes: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,14 +165,14 @@ export interface SafetyEventTable {
 // ---------------------------------------------------------------------------
 
 export interface AccessLogTable {
-  id: Generated<string>;
-  actor_type: string;
-  actor_id: string | null;
+  id: ColumnType<bigint, never, never>;
+  actor: string;
   action: string;
-  resource_type: string;
-  resource_id: string | null;
-  metadata: unknown | null;
-  created_at: ColumnType<Date, never, never>;
+  object_schema: string;
+  object_table: string;
+  object_id: string | null;
+  occurred_at: ColumnType<Date, never, never>;
+  detail: unknown | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +203,6 @@ export interface Database {
   'audit.access_log': AccessLogTable;
 }
 
-// Helpers para cada tabela
 export type Instrument = Selectable<InstrumentTable>;
 export type Subscale = Selectable<SubscaleTable>;
 export type Item = Selectable<ItemTable>;
@@ -218,7 +214,6 @@ export type ItemResponse = Selectable<ItemResponseTable>;
 export type AssessmentScore = Selectable<AssessmentScoreTable>;
 export type SafetyEvent = Selectable<SafetyEventTable>;
 
-export type NewConsent = Insertable<ConsentTable>;
 export type NewAssessment = Insertable<AssessmentTable>;
 export type NewItemResponse = Insertable<ItemResponseTable>;
 export type NewAssessmentScore = Insertable<AssessmentScoreTable>;

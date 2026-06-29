@@ -33,32 +33,29 @@ const norms: Norm[] = [
   {
     id: 'n1',
     instrument_id: INSTRUMENT_ID,
-    subscale_id: null,
+    scope: 'total',
     band: 'green',
-    score_min: 1,
-    score_max: 2.4,
-    is_placeholder: false,
-    created_at: new Date(),
+    min_score: 1,
+    max_score: 2.4,
+    source_note: null,
   },
   {
     id: 'n2',
     instrument_id: INSTRUMENT_ID,
-    subscale_id: null,
+    scope: 'total',
     band: 'orange',
-    score_min: 2.5,
-    score_max: 3.4,
-    is_placeholder: false,
-    created_at: new Date(),
+    min_score: 2.5,
+    max_score: 3.4,
+    source_note: null,
   },
   {
     id: 'n3',
     instrument_id: INSTRUMENT_ID,
-    subscale_id: null,
+    scope: 'total',
     band: 'red',
-    score_min: 3.5,
-    score_max: 5,
-    is_placeholder: false,
-    created_at: new Date(),
+    min_score: 3.5,
+    max_score: 5,
+    source_note: null,
   },
 ];
 
@@ -127,10 +124,9 @@ describe('computeScore — BAT (mean, primary only)', () => {
     expect(result.normIsPlaceholder).toBe(false);
   });
 
-  test('banding null quando normas são placeholder (BR-6 guarda)', () => {
-    const placeholderNorms: Norm[] = [{ ...norms[0]!, is_placeholder: true }];
+  test('banding null quando não há normas (BR-6 guarda)', () => {
     const items = Array.from({ length: 10 }, () => makeItem({ score: 2 }));
-    const result = computeScore(items as ItemScoreInput[], batConfig as InstrumentConfig, placeholderNorms);
+    const result = computeScore(items as ItemScoreInput[], batConfig as InstrumentConfig, noNorms);
     expect(result.band).toBeNull();
     expect(result.normIsPlaceholder).toBe(true);
   });

@@ -58,12 +58,10 @@ export function computeScore(
       config.scoringMethod,
     );
 
-    const norm = norms.find(
-      (n) => n.subscale_id === subscaleId && n.instrument_id === config.instrumentId,
-    );
+    const norm = norms.find((n) => n.instrument_id === config.instrumentId);
 
-    const band = rawScore !== null && norm ? bandFromNorm(rawScore, norms, subscaleId, config.instrumentId) : null;
-    const normIsPlaceholder = norm?.is_placeholder ?? true;
+    const band = rawScore !== null && norm ? bandFromNorm(rawScore, norms, config.instrumentId) : null;
+    const normIsPlaceholder = !norm;
 
     subscaleScores.push({
       subscaleId,
@@ -96,14 +94,12 @@ export function computeScore(
   const isInconclusive = completeness < config.completenessFloor;
 
   // Banding total
-  const totalNorm = norms.find(
-    (n) => n.subscale_id === null && n.instrument_id === config.instrumentId,
-  );
-  const totalNormIsPlaceholder = totalNorm?.is_placeholder ?? true;
+  const totalNorm = norms.find((n) => n.instrument_id === config.instrumentId);
+  const totalNormIsPlaceholder = !totalNorm;
 
   let totalBand: 'green' | 'orange' | 'red' | null = null;
   if (total !== null && !isInconclusive && !totalNormIsPlaceholder) {
-    totalBand = bandFromNorm(total, norms, null, config.instrumentId);
+    totalBand = bandFromNorm(total, norms, config.instrumentId);
   }
 
   return {
@@ -125,15 +121,13 @@ function aggregate(scores: number[], method: 'mean' | 'sum'): number | null {
 function bandFromNorm(
   score: number,
   norms: Norm[],
-  subscaleId: string | null,
   instrumentId: string,
 ): 'green' | 'orange' | 'red' | null {
   const match = norms.find(
     (n) =>
       n.instrument_id === instrumentId &&
-      n.subscale_id === subscaleId &&
-      score >= n.score_min &&
-      score <= n.score_max,
+      score >= n.min_score &&
+      score <= n.max_score,
   );
   return match?.band ?? null;
 }
@@ -158,7 +152,7 @@ export class ScoringService {
         'ir.item_id',
         'i.item_number',
         'i.subscale_id',
-        's.is_primary',
+        's.type as subscale_type',
         'ir.score',
       ])
       .where('ir.assessment_id', '=', assessmentId)
@@ -168,7 +162,7 @@ export class ScoringService {
       itemId: r.item_id,
       itemNumber: r.item_number,
       subscaleId: r.subscale_id,
-      isPrimarySubscale: r.is_primary,
+      isPrimarySubscale: r.subscale_type === 'primary',
       score: r.score,
     }));
 
@@ -190,37 +184,29 @@ export class ScoringService {
         .execute();
 
       // Score total
-      if (result.total !== null) {
+      await trx
+        .insertInto('assessment.assessment_scores')
+        .values({
+          assessment_id: assessmentId,
+          subscale_id: null,
+          mean_score: result.total,
+          completeness: result.completeness,
+          band: result.band,
+        })
+        .execute();
+
+      // Scores por subescala
+      for (const ss of result.subscaleScores) {
         await trx
           .insertInto('assessment.assessment_scores')
           .values({
             assessment_id: assessmentId,
-            subscale_id: null,
-            score: result.total,
-            completeness_pct: result.completeness,
-            band: result.band,
-            norm_is_placeholder: result.normIsPlaceholder,
-            is_inconclusive: result.isInconclusive,
+            subscale_id: ss.subscaleId,
+            mean_score: ss.score,
+            completeness: (ss.coveredCount / ss.itemCount) * 100,
+            band: ss.band,
           })
           .execute();
-      }
-
-      // Scores por subescala
-      for (const ss of result.subscaleScores) {
-        if (ss.score !== null) {
-          await trx
-            .insertInto('assessment.assessment_scores')
-            .values({
-              assessment_id: assessmentId,
-              subscale_id: ss.subscaleId,
-              score: ss.score,
-              completeness_pct: (ss.coveredCount / ss.itemCount) * 100,
-              band: ss.band,
-              norm_is_placeholder: ss.normIsPlaceholder,
-              is_inconclusive: ss.coveredCount / ss.itemCount < config.completenessFloor / 100,
-            })
-            .execute();
-        }
       }
     });
 

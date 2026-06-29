@@ -96,9 +96,8 @@ export class SafetyService {
           .insertInto('assessment.safety_events')
           .values({
             assessment_id: assessmentId,
+            type: s.signal,
             severity: s.severity,
-            signal: s.signal,
-            flagged_assessment: shouldFlag,
           })
           .execute();
       }

@@ -54,7 +54,7 @@ export class WebhookService {
     const assessment = await this.db
       .selectFrom('assessment.assessments')
       .selectAll()
-      .where('elevenlabs_conversation_id', '=', payload.conversation_id)
+      .where('el_conversation_id', '=', payload.conversation_id)
       .executeTakeFirstOrThrow();
 
     const assessmentId = assessment.id;
