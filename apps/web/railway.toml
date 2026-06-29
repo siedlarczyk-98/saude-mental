@@ -4,4 +4,3 @@ buildCommand = "npm run build"
 
 [deploy]
 startCommand = "node_modules/.bin/next start -p $PORT"
-healthcheckPath = "/"
