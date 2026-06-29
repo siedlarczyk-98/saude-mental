@@ -1,5 +1,5 @@
 [build]
-buildCommand = "npm install && npm run build -w @saude-mental/shared && npm run build -w @saude-mental/api"
+buildCommand = "npm install && npm run build"
 
 [deploy]
 startCommand = "node apps/api/dist/server.js"

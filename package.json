@@ -3,7 +3,7 @@
   "private": true,
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "tsc --build apps/api/tsconfig.json",
     "dev:api": "npm run dev -w apps/api",
     "test": "npm run test --workspaces --if-present"
   },
