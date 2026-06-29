@@ -3,5 +3,5 @@ builder = "NIXPACKS"
 buildCommand = "npm run build"
 
 [deploy]
-startCommand = "npm run start"
+startCommand = "node_modules/.bin/next start -p $PORT"
 healthcheckPath = "/"
