@@ -190,9 +190,19 @@ export async function registerRoutes(app: FastifyInstance) {
 
     const config = getInstrumentConfigById(row.instrument_id);
     const webhookService = new WebhookService(db);
-    const result = await webhookService.process(payload, config);
 
-    return reply.send(result);
+    // O ElevenLabs tem timeout curto no webhook (~15s) e fecha a conexão (499)
+    // se não respondermos rápido. O processamento (2 LLMs + scoring + writes)
+    // leva mais que isso, então respondemos 200 imediatamente e processamos em
+    // background — o servidor é persistente no Railway, não serverless.
+    reply.status(200).send({ accepted: true });
+
+    webhookService
+      .process(payload, config)
+      .then((result) => request.log.info(result, 'webhook processado com sucesso'))
+      .catch((err) => request.log.error(err, 'falha ao processar webhook em background'));
+
+    return reply;
   },
   );
 
