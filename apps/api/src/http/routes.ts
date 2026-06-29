@@ -130,13 +130,26 @@ export async function registerRoutes(app: FastifyInstance) {
   // -------------------------------------------------------------------------
   app.post(
     '/webhook/elevenlabs',
+    { config: { rawBody: true } },
     async (request: FastifyRequest<{ Querystring: { h?: string } }>, reply: FastifyReply) => {
+    // Log de entrada — confirma que o ElevenLabs realmente está batendo aqui.
+    request.log.info(
+      {
+        hasQuerySecret: Boolean(request.query.h),
+        hasSignatureHeader: Boolean(request.headers['elevenlabs-signature']),
+        hasRawBody: Boolean((request as FastifyRequest & { rawBody?: Buffer }).rawBody),
+        bodyType: (request.body as { type?: string } | undefined)?.type ?? null,
+      },
+      'webhook/elevenlabs recebido',
+    );
+
     const secret = process.env['WEBHOOK_SECRET'];
     if (secret) {
       const querySecret = request.query.h;
       if (querySecret) {
         // ElevenLabs passa o secret via ?h=
         if (querySecret !== secret) {
+          request.log.warn('webhook rejeitado: secret de query (?h=) inválido');
           return reply.status(401).send({ error: 'invalid_signature' });
         }
       } else {
@@ -144,6 +157,10 @@ export async function registerRoutes(app: FastifyInstance) {
         const sig = request.headers['elevenlabs-signature'];
         const rawBody = (request as FastifyRequest & { rawBody?: Buffer }).rawBody;
         if (!rawBody || !sig || !verifySignature(rawBody, sig as string, secret)) {
+          request.log.warn(
+            { hasRawBody: Boolean(rawBody), hasSig: Boolean(sig) },
+            'webhook rejeitado: assinatura HMAC inválida',
+          );
           return reply.status(401).send({ error: 'invalid_signature' });
         }
       }
@@ -163,7 +180,13 @@ export async function registerRoutes(app: FastifyInstance) {
       .where('el_conversation_id', '=', payload.data.conversation_id)
       .executeTakeFirst();
 
-    if (!row) return reply.status(404).send({ error: 'assessment_not_found' });
+    if (!row) {
+      request.log.warn(
+        { conversationId: payload.data.conversation_id },
+        'webhook: assessment não encontrado para o conversation_id (call/started não salvou?)',
+      );
+      return reply.status(404).send({ error: 'assessment_not_found' });
+    }
 
     const config = getInstrumentConfigById(row.instrument_id);
     const webhookService = new WebhookService(db);
@@ -300,12 +323,19 @@ function buildResultResponse(opts: {
   };
 }
 
+// Valida a assinatura no formato do ElevenLabs:
+//   ElevenLabs-Signature: t=<timestamp>,v0=<hmac_sha256("<timestamp>.<body>")>
 function verifySignature(body: Buffer, signature: string, secret: string): boolean {
+  const parts = signature.split(',');
+  const timestamp = parts.find((p) => p.startsWith('t='))?.slice(2);
+  const provided = parts.find((p) => p.startsWith('v0='))?.slice(3);
+  if (!timestamp || !provided) return false;
+
   const hmac = crypto.createHmac('sha256', secret);
-  hmac.update(body);
-  const expected = `sha256=${hmac.digest('hex')}`;
+  hmac.update(`${timestamp}.${body.toString('utf8')}`);
+  const expected = hmac.digest('hex');
   try {
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
   } catch {
     return false;
   }

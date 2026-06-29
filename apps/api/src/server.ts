@@ -2,6 +2,7 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import rawBody from 'fastify-raw-body';
 import { registerRoutes } from './http/routes.js';
 
 const app = Fastify({
@@ -13,6 +14,16 @@ await app.register(cors, {
 });
 
 await app.register(helmet);
+
+// Captura o corpo cru (Buffer) das requisições para validar a assinatura HMAC
+// do webhook do ElevenLabs. Sem isso, request.rawBody fica undefined e toda
+// validação por header falha com 401.
+await app.register(rawBody, {
+  field: 'rawBody',
+  global: false, // habilitado por rota via { config: { rawBody: true } }
+  encoding: false, // mantém como Buffer
+  runFirst: true,
+});
 
 app.setErrorHandler((error, _request, reply) => {
   app.log.error(error);
