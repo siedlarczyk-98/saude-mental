@@ -114,16 +114,26 @@ export async function registerRoutes(app: FastifyInstance) {
   );
 
   // -------------------------------------------------------------------------
-  // POST /webhooks/elevenlabs — payload pós-call do ElevenLabs
+  // POST /webhook/elevenlabs — payload pós-call do ElevenLabs
   // -------------------------------------------------------------------------
-  app.post('/webhooks/elevenlabs', async (request: FastifyRequest, reply: FastifyReply) => {
-    // Validação de assinatura HMAC (opcional, via WEBHOOK_SECRET)
+  app.post(
+    '/webhook/elevenlabs',
+    async (request: FastifyRequest<{ Querystring: { h?: string } }>, reply: FastifyReply) => {
     const secret = process.env['WEBHOOK_SECRET'];
     if (secret) {
-      const sig = request.headers['x-elevenlabs-signature'];
-      const rawBody = (request as FastifyRequest & { rawBody?: Buffer }).rawBody;
-      if (!rawBody || !sig || !verifySignature(rawBody, sig as string, secret)) {
-        return reply.status(401).send({ error: 'invalid_signature' });
+      const querySecret = request.query.h;
+      if (querySecret) {
+        // ElevenLabs passa o secret via ?h=
+        if (querySecret !== secret) {
+          return reply.status(401).send({ error: 'invalid_signature' });
+        }
+      } else {
+        // Fallback: validação HMAC via header
+        const sig = request.headers['x-elevenlabs-signature'];
+        const rawBody = (request as FastifyRequest & { rawBody?: Buffer }).rawBody;
+        if (!rawBody || !sig || !verifySignature(rawBody, sig as string, secret)) {
+          return reply.status(401).send({ error: 'invalid_signature' });
+        }
       }
     }
 
@@ -148,7 +158,8 @@ export async function registerRoutes(app: FastifyInstance) {
     const result = await webhookService.process(payload, config);
 
     return reply.send(result);
-  });
+  },
+  );
 
   // -------------------------------------------------------------------------
   // GET /assessments/:token/result — resultado individual (BR-11)
