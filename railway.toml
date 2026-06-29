@@ -1,5 +1,5 @@
 [build]
-buildCommand = "npm install && npm run build"
+buildCommand = "npm install --include=dev && npm run build"
 
 [deploy]
 startCommand = "node apps/api/dist/server.js"
