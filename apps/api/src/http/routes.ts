@@ -270,7 +270,10 @@ function buildResultResponse(opts: {
   assessmentStatus: string;
 }) {
   const { totalScore, hasCrisis } = opts;
-  const isInconclusive = totalScore?.mean_score === null || totalScore === undefined;
+  const totalMeanScore = totalScore?.mean_score === null || totalScore?.mean_score === undefined
+    ? null
+    : Number(totalScore.mean_score);
+  const isInconclusive = totalMeanScore === null || totalScore === undefined;
   const normIsPlaceholder = totalScore?.band === null && !isInconclusive;
 
   let summaryText: string;
@@ -280,7 +283,7 @@ function buildResultResponse(opts: {
       'Isso pode acontecer se a chamada foi interrompida ou muito breve.';
   } else if (normIsPlaceholder) {
     summaryText =
-      `Sua pontuação geral foi de ${totalScore?.mean_score?.toFixed(2) ?? 'N/A'} (escala 1–5). ` +
+      `Sua pontuação geral foi de ${totalMeanScore?.toFixed(2) ?? 'N/A'} (escala 1–5). ` +
       'Os parâmetros de referência ainda estão em calibração para a população brasileira, ' +
       'por isso não é possível apresentar uma classificação de risco neste momento.';
   } else {
@@ -291,7 +294,7 @@ function buildResultResponse(opts: {
     };
     const bandLabel = totalScore?.band ? (bandLabels[totalScore.band] ?? 'indeterminado') : 'indeterminado';
     summaryText =
-      `Sua pontuação geral foi de ${totalScore?.mean_score?.toFixed(2) ?? 'N/A'} (escala 1–5), ` +
+      `Sua pontuação geral foi de ${totalMeanScore?.toFixed(2) ?? 'N/A'} (escala 1–5), ` +
       `indicando ${bandLabel}.`;
   }
 
@@ -320,14 +323,14 @@ function buildResultResponse(opts: {
     calibrationPending: normIsPlaceholder,
     total: totalScore
       ? {
-          score: totalScore.mean_score,
+          score: totalMeanScore,
           completeness: totalScore.completeness,
           band: totalScore.band,
         }
       : null,
     subscales: opts.subscaleScores.map((s) => ({
       subscaleId: s.subscale_id,
-      score: s.mean_score,
+      score: s.mean_score === null ? null : Number(s.mean_score),
       band: s.band,
     })),
   };
