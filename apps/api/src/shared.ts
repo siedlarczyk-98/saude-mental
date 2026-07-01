@@ -17,6 +17,5 @@ export interface InstrumentConfig {
   completenessFloor: number;
   totalIncludes: 'primary' | 'all';
   clusters: ClusterDef[];
-  agentPromptTemplate: string;
   extractionSpec: FieldSpec[];
 }

@@ -324,7 +324,7 @@ function buildResultResponse(opts: {
     total: totalScore
       ? {
           score: totalMeanScore,
-          completeness: totalScore.completeness,
+          completeness: Number(totalScore.completeness),
           band: totalScore.band,
         }
       : null,
